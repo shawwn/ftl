@@ -1,0 +1,15 @@
+{
+  "name": "faster-than-lumos",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node server/main.js",
+    "dev": "node --watch server/main.js",
+    "test": "node --test \"test/*.test.js\"",
+    "test:e2e": "node --test \"test/e2e/*.test.js\"",
+    "duel": "node tools/duel.js",
+    "check": "npx -y -p typescript@5 tsc -p jsconfig.json --noEmit"
+  },
+  "dependencies": { "ws": "^8.18.0" }
+}

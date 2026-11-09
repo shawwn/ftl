@@ -1,0 +1,531 @@
+/* Faster than Lumos: layout, touch rules and theme (design doc 17.4, 17.5).
+   Colors are custom properties copied from THEME (client/theme.js) at boot; the fallbacks below only
+   cover the first paint. Light means power: amber is power, cyan shield, cold blue ion, red damage. */
+
+:root {
+  --ink: #0b0d1a;
+  --hair: rgba(195, 203, 255, 0.14);
+  --hair-strong: rgba(195, 203, 255, 0.28);
+  --glow-amber: 0 0 10px rgba(255, 207, 110, 0.55);
+  --radius-pill: 999px;
+  --bar-h: 48px;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--ink, #0b0d1a);
+  color: var(--text, #e9e7f5);
+  font-family: var(--font, system-ui, sans-serif);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  overflow: hidden;
+}
+
+button, input { font: inherit; color: inherit; }
+
+button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+}
+button:disabled { cursor: default; }
+button:focus-visible, input:focus-visible {
+  outline: 2px solid var(--mark);
+  outline-offset: 2px;
+}
+
+#app {
+  height: 100dvh;
+  display: grid;
+  grid-template-areas: "bar" "stage" "hud";
+  grid-template-rows: var(--bar-h) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* ---- top bar ---- */
+
+#bar {
+  grid-area: bar;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 8px 0 16px;
+  min-width: 0;
+  border-bottom: 1px solid var(--hair);
+  white-space: nowrap;
+}
+.brand { display: flex; align-items: center; gap: 9px; font-weight: 620; font-size: 15px; letter-spacing: 0.01em; }
+.lamp {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--amber);
+  box-shadow: 0 0 10px 2px rgba(255, 207, 110, 0.55);
+}
+.bar-match { color: var(--dim); font-size: 13px; }
+.bar-match b { color: var(--mark); font-weight: 650; letter-spacing: 0.08em; }
+.bar-vs { color: var(--dim); font-size: 13px; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.bar-gap { flex: 1; }
+.bar-btn {
+  min-width: 44px; height: 44px;
+  padding: 0 16px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: 14px;
+}
+.bar-btn:active { border-color: var(--hair-strong); }
+.bar-btn[aria-pressed="true"] { color: var(--amber); }
+
+/* ---- stage ---- */
+
+#stage { grid-area: stage; position: relative; min-height: 0; min-width: 0; }
+#canvas {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+/* ---- HUD ---- */
+
+#hud {
+  grid-area: hud;
+  position: relative;
+  display: grid;
+  grid-template-areas: "power weapons crew";
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 28px;
+  padding: 12px 20px 14px;
+  height: 196px;
+  border-top: 1px solid var(--hair);
+  background: linear-gradient(to bottom, rgba(16, 19, 42, 0.92), var(--inkPanel));
+}
+#hud[hidden] { display: none; }
+
+.hud-label { display: block; font-size: 12px; color: var(--dim); margin-bottom: 8px; }
+
+.hud-power { grid-area: power; display: flex; gap: 18px; min-height: 0; }
+.hud-weapons { grid-area: weapons; min-width: 0; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+.hud-crew { grid-area: crew; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+
+/* reactor: a lamp core of filaments; lit filaments are free bars */
+.reactor { display: flex; flex-direction: column; align-items: center; min-height: 0; }
+.fils {
+  flex: 1;
+  display: flex; flex-direction: column-reverse; gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+  min-height: 0;
+}
+.fil {
+  flex: 1;
+  width: 24px; min-height: 4px; max-height: 14px;
+  border-radius: 3px;
+  border: 1px solid var(--faint);
+}
+.fil.lit { background: var(--amber); border-color: var(--amber); box-shadow: var(--glow-amber); }
+.reactor-n { margin-top: 6px; font-size: 12px; color: var(--dim); }
+
+/* systems: one column per system, pips bottom to top, then the stepper */
+.systems { display: flex; gap: 10px; min-height: 0; }
+.sys {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) 44px;
+  gap: 8px;
+  justify-items: center;
+  width: 92px;
+  min-height: 0;
+}
+.sys[data-fixed] { width: auto; min-width: 56px; }
+.sys-label { font-size: 12px; color: var(--dim); display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.manned { width: 6px; height: 6px; border-radius: 50%; border: 1px solid var(--faint); }
+.manned.on { background: var(--amber); border-color: var(--amber); box-shadow: var(--glow-amber); }
+.pips {
+  display: flex; flex-direction: column-reverse; gap: 3px;
+  width: 44px; min-height: 0;
+  touch-action: none;
+}
+.sys[data-fixed] .pips { touch-action: auto; }
+.pip {
+  flex: 1;
+  min-height: 3px; max-height: 14px;
+  border-radius: 2px;
+  border: 1px solid var(--faint);
+  transition: background-color 120ms, box-shadow 120ms;
+}
+.pip.lit { background: var(--amber); border-color: var(--amber); box-shadow: var(--glow-amber); }
+.pip.wanted { border: 1px dashed rgba(255, 207, 110, 0.7); }
+.pip.locked { background: rgba(154, 184, 255, 0.35); border-color: var(--ion); box-shadow: 0 0 8px rgba(154, 184, 255, 0.5); }
+.pip.dmg {
+  border-color: var(--damage);
+  background: repeating-linear-gradient(135deg, var(--damage) 0 2px, transparent 2px 5px);
+}
+.pip.preview { outline: 1px solid var(--mark); outline-offset: 1px; }
+.sys { grid-template-columns: 1fr 1fr; column-gap: 4px; }
+.sys-label, .pips { grid-column: 1 / -1; }
+.sys-btn { grid-row: 3; }
+.sys > .sys-btn[aria-label^="Less"] { grid-column: 1; justify-self: end; }
+.sys > .sys-btn[aria-label^="More"] { grid-column: 2; justify-self: start; }
+.sys-btn {
+  width: 44px; height: 44px;
+  display: grid; place-items: center;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--hair-strong);
+  border-radius: 50%;
+}
+.sys-btn svg, .w-tog svg { width: 18px; height: 18px; fill: none; stroke: var(--line); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.sys-btn:active:not(:disabled) { background: rgba(255, 207, 110, 0.12); border-color: var(--amber); }
+.sys-btn:disabled { opacity: 0.28; }
+/* the stepper row keeps its height (grid-template-rows), so pip stacks stay aligned without the buttons */
+.sys[data-fixed] .sys-btn, #hud[data-readonly] .sys-btn { display: none; }
+
+/* weapons */
+.cards {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(2, 64px);
+  grid-auto-columns: minmax(200px, 340px);
+  gap: 8px;
+  min-height: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;   /* only ever seen when more weapons than fit (a visible cue, not a hidden one) */
+}
+.weapon {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  background: rgba(11, 13, 26, 0.55);
+  transition: border-color 140ms, box-shadow 140ms;
+}
+.w-body {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; justify-content: center; gap: 6px;
+  padding: 6px 12px;
+  text-align: left;
+  background: none; border: 0; border-radius: 12px 0 0 12px;
+}
+.w-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.w-num {
+  flex: none;
+  width: 18px; height: 18px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 11px; font-weight: 650; color: var(--dim);
+  border: 1px solid var(--hair-strong);
+}
+.w-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w-badge { margin-left: auto; padding-left: 8px; font-size: 12px; color: var(--mark); white-space: nowrap; }
+.w-badge { display: flex; align-items: center; gap: 5px; }
+.w-badge:not(:empty)::before { content: ''; width: 6px; height: 6px; border: 1.5px solid var(--mark); border-radius: 50%; }
+.w-bar { display: block; height: 4px; border-radius: 2px; background: rgba(58, 63, 102, 0.7); overflow: hidden; }
+.w-bar i { display: block; height: 100%; background: var(--amber); transform-origin: left; box-shadow: var(--glow-amber); }
+.w-foot { display: flex; font-size: 12px; color: var(--dim); white-space: nowrap; min-width: 0; }
+.w-note { overflow: hidden; text-overflow: ellipsis; }
+.w-togs { display: flex; border-left: 1px solid var(--hair); }
+.w-tog {
+  position: relative;
+  width: 48px; min-height: 44px;
+  display: grid; place-items: center; align-content: center; gap: 3px;
+  padding: 0;
+  background: none; border: 0;
+}
+.w-tog + .w-tog { border-left: 1px solid var(--hair); }
+.w-togs .w-tog:last-child { border-radius: 0 12px 12px 0; }
+.w-tog.lit svg { stroke: var(--amber); filter: drop-shadow(0 0 4px rgba(255, 207, 110, 0.8)); }
+.w-tog.wanted svg { stroke: var(--amber); opacity: 0.55; }
+.w-tog:disabled { opacity: 0.5; }
+.w-cost { display: flex; gap: 2px; }
+.w-cost i { width: 6px; height: 3px; border-radius: 1px; background: var(--faint); }
+.w-tog.lit .w-cost i { background: var(--amber); }
+.weapon.off .w-name, .weapon.starved .w-name { color: var(--dim); }
+.weapon.off .w-bar i, .weapon.starved .w-bar i { background: var(--faint); box-shadow: none; }
+.weapon.ready .w-bar i { background: var(--mark); box-shadow: 0 0 10px rgba(255, 244, 220, 0.8); }
+.weapon.empty .w-bar i { background: var(--faint); box-shadow: none; }
+.weapon.empty .w-foot { color: var(--damage); }
+.weapon.ready .w-foot { color: var(--mark); }
+.weapon.aiming { border-color: var(--mark); box-shadow: 0 0 0 1px var(--mark), 0 0 22px rgba(255, 244, 220, 0.22); }
+.w-blurb { display: none; font-size: 11.5px; line-height: 13px; color: var(--text); overflow: hidden;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.weapon.aiming .w-body { gap: 4px; padding-top: 4px; padding-bottom: 4px; }
+.weapon.aiming .w-foot { display: none; }
+.weapon.aiming .w-blurb { display: -webkit-box; }
+.weapon.aiming .w-num, .weapon.targeted .w-num { color: var(--ink); background: var(--mark); border-color: var(--mark); }
+#hud[data-readonly] .w-togs { display: none; }
+
+/* crew */
+.chips { display: grid; grid-template-columns: repeat(2, minmax(0, 178px)); gap: 8px; align-content: start; }
+.chip {
+  display: flex; align-items: center; gap: 9px;
+  min-height: 44px; min-width: 0;
+  padding: 0 12px 0 6px;
+  text-align: left;
+  background: rgba(11, 13, 26, 0.55);
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-pill);
+}
+.mote {
+  flex: none;
+  width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 11px; font-weight: 650;
+  border: 1.5px solid var(--hair-strong);
+}
+.c-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.c-name { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.c-hp { display: block; height: 3px; border-radius: 2px; background: var(--faint); overflow: hidden; }
+.c-hp i { display: block; height: 100%; background: var(--text); transform-origin: left; }
+.c-task { font-size: 11px; color: var(--dim); white-space: nowrap; }
+.chip.man .mote { border-color: var(--amber); box-shadow: var(--glow-amber); }
+.chip.repair .mote { border-color: var(--mark); }
+.chip.hurt .c-hp i { background: var(--damage); }
+.chip.selected { border-color: var(--mark); box-shadow: 0 0 0 1px var(--mark), 0 0 18px rgba(255, 244, 220, 0.2); }
+.chip:disabled { cursor: default; }
+
+/* pending commands pulse softly until the snapshot that reflects them */
+.pending { animation: pend 0.9s ease-in-out infinite; }
+@keyframes pend { 50% { opacity: 0.55; } }
+
+/* toasts float just above the HUD, over the stage */
+.toasts {
+  position: absolute; left: 0; right: 0; bottom: calc(100% + 10px);
+  z-index: 1;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  pointer-events: none;
+}
+.toast {
+  max-width: min(92vw, 420px);
+  padding: 9px 16px;
+  font-size: 14px;
+  background: rgba(16, 19, 42, 0.94);
+  border: 1px solid rgba(255, 90, 95, 0.55);
+  border-radius: var(--radius-pill);
+  transition: opacity 400ms;
+}
+.toast.gone { opacity: 0; }
+/* ---- overlay: start menu, waiting, outcome ---- */
+
+#overlay { grid-area: stage; z-index: 2; display: grid; place-items: center; padding: 16px; min-height: 0; }
+#overlay[hidden] { display: none; }
+/* The waiting and outcome panels may cover the HUD row too, so their buttons are never below the fold:
+   once ended the HUD is inert (every order is acked 'ended'), and while waiting nothing has started. */
+body[data-menu="waiting"] #overlay, body[data-menu="outcome"] #overlay { grid-row: 2 / 4; }
+.panel {
+  width: min(100%, 460px);
+  max-height: 100%;
+  overflow: auto;
+  padding: 28px;
+  background: rgba(11, 13, 26, 0.86);
+  border: 1px solid var(--hair);
+  border-radius: 20px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.panel h2 { margin: 0 0 6px; font-size: 20px; font-weight: 620; }
+.lede { margin: 0 0 18px; color: var(--dim); font-size: 15px; line-height: 1.5; max-width: 40ch; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn, .go, .opt, .code, .link { min-height: 44px; border-radius: var(--radius-pill); }
+.btn {
+  padding: 0 18px;
+  background: none;
+  border: 1px solid var(--hair-strong);
+  font-size: 15px;
+}
+.btn:active { border-color: var(--amber); }
+.btn.quiet { border-color: transparent; color: var(--dim); }
+.go {
+  padding: 0 26px;
+  min-height: 52px;
+  background: var(--amber);
+  color: var(--ink);
+  border: 0;
+  font-size: 16px; font-weight: 650;
+  box-shadow: 0 0 28px rgba(255, 207, 110, 0.35);
+}
+.go:active { filter: brightness(1.1); }
+.link { align-self: flex-start; padding: 0 2px; background: none; border: 0; color: var(--dim); font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
+
+.outcome { text-align: center; }
+.outcome .lede { margin: 0 auto 10px; }
+.outcome .row { justify-content: center; margin-top: 18px; }
+.verdict { font-size: clamp(36px, min(9vw, 13dvh), 76px) !important; line-height: 1; letter-spacing: -0.02em; margin: 4px 0 14px !important; }
+.outcome.won .verdict { color: var(--amber); text-shadow: 0 0 34px rgba(255, 207, 110, 0.55); }
+.outcome.lost .verdict { color: var(--damage); text-shadow: 0 0 30px rgba(255, 90, 95, 0.35); }
+.seed { color: var(--dim); font-size: 13px; margin: 0; }
+.bigcode { font-size: 44px; font-weight: 650; letter-spacing: 0.18em; color: var(--mark); margin: 6px 0; text-shadow: 0 0 22px rgba(255, 244, 220, 0.35); }
+.share { color: var(--dim); font-size: 13px; word-break: break-all; margin: 0 0 16px; user-select: text; -webkit-user-select: text; }
+
+/* start screen: the menu is a column beside the ships, not a box over them */
+body[data-menu="start"] #app {
+  grid-template-areas: "menu stage";
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(380px, 40%) minmax(0, 1fr);
+}
+body[data-menu="start"] #bar, body[data-menu="start"] #hud { display: none; }
+body[data-menu="start"] #overlay { grid-area: menu; place-items: center start; padding: 0; overflow: auto; }
+.start {
+  width: min(100%, 520px);
+  max-height: none;
+  overflow: visible;
+  padding: clamp(24px, 6vw, 72px);
+  background: none; border: 0; border-radius: 0;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+  display: flex; flex-direction: column; gap: 22px;
+}
+.title {
+  margin: 0;
+  font-size: clamp(38px, 4.6vw, 62px);
+  font-weight: 640;
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+  text-shadow: 0 0 36px rgba(255, 207, 110, 0.28);
+}
+.start .lede { margin: -6px 0 0; }
+.note { margin: 0; padding: 10px 14px; border: 1px solid rgba(255, 90, 95, 0.5); border-radius: 12px; font-size: 14px; }
+.group { display: flex; flex-direction: column; gap: 12px; }
+.group h2 { margin: 0; font-size: 15px; font-weight: 620; color: var(--text); }
+.group.primary { padding: 18px; border: 1px solid var(--hair); border-radius: 18px; background: rgba(16, 19, 42, 0.6); }
+.field { display: flex; flex-direction: column; gap: 7px; }
+.field-label { font-size: 12px; color: var(--dim); }
+.opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.opt { padding: 0 14px; background: none; border: 1px solid var(--hair-strong); font-size: 14px; }
+.opt[aria-pressed="true"] {
+  border-color: var(--amber);
+  background: rgba(255, 207, 110, 0.1);
+  box-shadow: 0 0 14px rgba(255, 207, 110, 0.22);
+}
+.blurb { margin: -2px 0 0; color: var(--dim); font-size: 13px; line-height: 1.45; }
+.group .go { align-self: flex-start; margin-top: 4px; }
+.join .code {
+  width: 8.5ch;
+  padding: 0 12px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  background: none;
+  border: 1px solid var(--hair-strong);
+  user-select: text; -webkit-user-select: text;
+}
+.join .code::placeholder { letter-spacing: 0.04em; text-transform: none; color: var(--dim); }
+
+#banner {
+  position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 56px); transform: translateX(-50%);
+  z-index: 5;
+  padding: 9px 16px;
+  font-size: 14px;
+  background: rgba(16, 19, 42, 0.96);
+  border: 1px solid rgba(154, 184, 255, 0.5);
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+#banner[hidden] { display: none; }
+
+/* short screens: overlay panels tighten so their buttons fit */
+@media (max-height: 420px) {
+  .panel:not(.start) { padding: 16px 22px; }
+  .bigcode { font-size: 32px; margin: 0; }
+  .wait .share { display: none; }   /* the Copy button carries the link */
+  .outcome .row { margin-top: 12px; }
+}
+
+/* ---- landscape without room for full crew chips (tablets, small laptops, phones): crew are 44 px motes,
+   and the width goes to the weapon cards ---- */
+
+@media (orientation: landscape) and (max-width: 1279px), (orientation: landscape) and (max-height: 520px) {
+  .chips { grid-template-columns: repeat(2, 44px); gap: 6px; }
+  .chip { width: 44px; padding: 0; justify-content: center; border-radius: 50%; }
+  .chip .c-main, .chip .c-task { display: none; }
+}
+
+/* ---- phone portrait ---- */
+
+@media (orientation: portrait) {
+  :root { --bar-h: 44px; }
+  #bar { gap: 10px; padding-left: 14px; }
+  .brand-name, .bar-vs { display: none; }
+  #hud {
+    grid-template-areas: "weapons" "power" "crew";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    gap: 10px;
+    height: auto;
+    padding: 10px 12px 10px;
+  }
+  .hud-label { display: none; }
+  .hud-power { flex-direction: column; gap: 8px; }
+  .reactor { flex-direction: row; gap: 10px; }
+  .reactor .hud-label { display: block; margin: 0; }
+  .fils { flex: none; flex-direction: row; padding: 4px; border-radius: 10px; }
+  .fil { width: 18px; height: 12px; max-height: none; }
+  .reactor-n { margin: 0; }
+  .systems { gap: 6px; height: 112px; }
+  .sys, .sys[data-fixed] { width: auto; flex: 1 1 0; min-width: auto; }
+  .sys[data-fixed] { flex-grow: 0.6; }
+  .sys-label { font-size: 11px; white-space: nowrap; }
+  .cards { grid-template-rows: auto; grid-auto-columns: minmax(var(--card-min), 1fr); scroll-snap-type: x mandatory; }
+  .weapon { scroll-snap-align: start; }
+  .systems { height: 104px; }
+  .chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+  .chip { flex: 1 0 auto; padding-right: 10px; }
+  .c-task { display: none; }
+  body[data-menu="start"] #app {
+    grid-template-areas: "stage" "menu";
+    grid-template-rows: minmax(200px, 34dvh) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
+  }
+  body[data-menu="start"] #overlay { place-items: start stretch; }
+  .start { width: 100%; padding: 4px 18px 28px; gap: 18px; }
+  .title { font-size: 38px; }
+}
+
+/* ---- phone landscape: one compact HUD row that keeps only controls. Read-only system columns (helm,
+   weapons) go, since every room on the canvas draws the same power bars, so two weapon cards with their
+   toggles fit from 568 px wide, and three from 667 (narrower, the third peeks in and scrolls) ---- */
+
+@media (orientation: landscape) and (max-height: 520px) {
+  :root { --bar-h: 44px; }
+  .bar-vs { display: none; }
+  #hud { height: 124px; gap: 10px; padding: 8px 10px; }
+  .hud-label { display: none; }
+  .hud-power, .systems { gap: 6px; }
+  .sys[data-fixed] { display: none; }
+  .fils { padding: 4px; border-radius: 10px; }
+  .fil { width: 16px; }
+  .reactor-n { font-size: 11px; margin-top: 3px; }
+  .sys { width: 92px; gap: 5px; }
+  .sys-label { font-size: 11px; }
+  .cards { grid-template-rows: minmax(0, 1fr); grid-auto-columns: minmax(var(--card-min), 1fr); height: 100%; }
+  body[data-menu="start"] #app { grid-template-columns: minmax(340px, 46%) minmax(0, 1fr); }
+  .start { padding: 20px 24px; gap: 14px; }
+  .title { font-size: 34px; }
+}
+
+/* ---- both phone layouts: weapon cards stack their toggles under the body. Cards share the row down to
+   --card-min (two 44 px toggles and the border), so a third weapon (Lampblack) is never silently pushed
+   out of view: three fit from 286 px of row, and beyond that the next card visibly peeks in ---- */
+
+@media (orientation: portrait), (orientation: landscape) and (max-height: 520px) {
+  :root { --card-min: 90px; }
+  .weapon { flex-direction: column; }
+  .w-body { border-radius: 12px 12px 0 0; padding: 7px 10px 6px; gap: 5px; }
+  .w-togs { border-left: 0; border-top: 1px solid var(--hair); }
+  .w-tog { flex: 1; min-height: 44px; }
+  .w-togs .w-tog:last-child { border-radius: 0 0 12px 0; }
+  .w-togs .w-tog:first-child { border-radius: 0 0 0 12px; }
+  .w-name { font-size: 13px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pending { animation: none; opacity: 0.7; }
+  .pip, .weapon, .toast { transition: none; }
+}
